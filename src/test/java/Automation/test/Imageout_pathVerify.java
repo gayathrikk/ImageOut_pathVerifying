@@ -6,7 +6,6 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -29,6 +28,17 @@ public class Imageout_pathVerify {
 
     @Test
     public void testDB() {
+        // Retrieve the slidebatchId parameter passed from Jenkins
+        String slidebatchId = System.getenv("SLIDEBATCH_ID"); // Retrieve slidebatchId from Jenkins parameter
+
+        if (slidebatchId == null || slidebatchId.isEmpty()) {
+            System.out.println("Slidebatch ID is not provided. Please ensure the parameter is passed.");
+            return;
+        }
+
+        // Convert to integer
+        int slidebatchIdInt = Integer.parseInt(slidebatchId);
+
         String url = "jdbc:mysql://apollo2.humanbrain.in:3306/HBA_V2";
         String username = "root";
         String password = "Health#123";
@@ -37,16 +47,8 @@ public class Imageout_pathVerify {
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
             System.out.println("MYSQL database connected");
 
-            // Get slidebatch ID from user input
-            Scanner scanner = new Scanner(System.in);
-            System.out.println("Enter the slidebatch ID:");
-            int slidebatchId = scanner.nextInt();
-
-            // Close the scanner to avoid resource leaks
-            scanner.close();
-
             // Execute the query and collect results
-            List<QueryResult> queryResults = executeAndCollectQueryResults(connection, slidebatchId);
+            List<QueryResult> queryResults = executeAndCollectQueryResults(connection, slidebatchIdInt);
 
             // Print the query results in a table format
             printQueryResults(queryResults);
@@ -137,16 +139,5 @@ public class Imageout_pathVerify {
 
         // Check if jp2Path starts with the expected prefix
         return jp2Path.startsWith(expectedPrefix);
-    }
-
-    private List<String> filterSectionNumbers(List<String> sectionNumbers) {
-        // Example filter: only keep section numbers that start with "SE_"
-        List<String> filteredSections = new ArrayList<>();
-        for (String section : sectionNumbers) {
-            if (section.startsWith("SE_")) {
-                filteredSections.add(section);
-            }
-        }
-        return filteredSections;
     }
 }
