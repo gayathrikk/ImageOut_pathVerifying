@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -28,15 +29,27 @@ public class Imageout_pathVerify {
 
     @Test
     public void testDB() {
-        // Retrieve the slidebatchId parameter passed from Jenkins
-        String slidebatchId = System.getenv("SLIDEBATCH_ID"); // Retrieve slidebatchId from Jenkins parameter
+        // Retrieve slidebatchId from Jenkins parameter or ask for manual input in Eclipse
+        String slidebatchId = System.getenv("SLIDEBATCH_ID"); // Retrieve slidebatchId from Jenkins
 
+        // If the slidebatchId is not passed from Jenkins, prompt the user in Eclipse for input
         if (slidebatchId == null || slidebatchId.isEmpty()) {
-            System.out.println("Slidebatch ID is not provided. Please ensure the parameter is passed.");
-            return;
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Slidebatch ID is not provided via Jenkins. Please enter the Slidebatch ID manually:");
+            slidebatchId = scanner.nextLine();
+            scanner.close();  // Close the scanner after use
         }
 
-        // Convert to integer
+        // Log the value of slidebatchId for debugging purposes
+        System.out.println("Received Slidebatch ID: " + slidebatchId);
+
+        // Check if slidebatchId is valid (not empty or null)
+        if (slidebatchId == null || slidebatchId.isEmpty()) {
+            System.out.println("Slidebatch ID is not provided. Please ensure the parameter is passed.");
+            return; // Exit the test if slidebatchId is not provided
+        }
+
+        // Convert slidebatchId to integer
         int slidebatchIdInt = Integer.parseInt(slidebatchId);
 
         String url = "jdbc:mysql://apollo2.humanbrain.in:3306/HBA_V2";
