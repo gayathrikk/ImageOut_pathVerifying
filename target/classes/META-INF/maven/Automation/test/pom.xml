@@ -77,15 +77,15 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.1</version>
           <configuration>
-            <source>${maven.compiler.source}</source>
-            <target>${maven.compiler.target}</target>
+            <source>11</source>
+            <target>11</target>
           </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
           <version>3.0.0-M5</version>
           <configuration>
-            <test>com.test.Database_Testing.Imageout_pathVerify</test>
+            <test>Automation.test.Imageout_pathVerify</test>
           </configuration>
         </plugin>
       </plugins>

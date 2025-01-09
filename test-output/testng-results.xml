@@ -2,12 +2,12 @@
 <testng-results ignored="0" total="1" passed="1" failed="0" skipped="0">
   <reporter-output>
   </reporter-output>
-  <suite started-at="2025-01-08T15:40:09 IST" name="Default suite" finished-at="2025-01-08T15:40:12 IST" duration-ms="2862">
+  <suite started-at="2025-01-09T12:50:56 IST" name="Default suite" finished-at="2025-01-09T12:51:00 IST" duration-ms="3868">
     <groups>
     </groups>
-    <test started-at="2025-01-08T15:40:09 IST" name="Default test" finished-at="2025-01-08T15:40:12 IST" duration-ms="2862">
+    <test started-at="2025-01-09T12:50:56 IST" name="Default test" finished-at="2025-01-09T12:51:00 IST" duration-ms="3868">
       <class name="Automation.test.Imageout_pathVerify">
-        <test-method signature="testDB()[pri:0, instance:Automation.test.Imageout_pathVerify@71def8f8]" started-at="2025-01-08T15:40:09 IST" name="testDB" finished-at="2025-01-08T15:40:12 IST" duration-ms="2839" status="PASS">
+        <test-method signature="testDB()[pri:0, instance:Automation.test.Imageout_pathVerify@71def8f8]" started-at="2025-01-09T12:50:56 IST" name="testDB" finished-at="2025-01-09T12:51:00 IST" duration-ms="3844" status="PASS">
           <reporter-output>
           </reporter-output>
         </test-method> <!-- testDB -->
