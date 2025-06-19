@@ -36,10 +36,12 @@
 
     <!-- Selenium -->
     <dependency>
-      <groupId>org.seleniumhq.selenium</groupId>
-      <artifactId>selenium-java</artifactId>
-      <version>4.18.1</version>
-    </dependency>
+  <groupId>org.testng</groupId>
+  <artifactId>testng</artifactId>
+  <version>7.10.1</version>
+  <scope>test</scope>
+</dependency>
+
 
     <!-- REST Assured -->
     <dependency>
