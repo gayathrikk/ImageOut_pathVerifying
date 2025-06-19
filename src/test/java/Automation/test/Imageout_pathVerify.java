@@ -1,15 +1,23 @@
 package Automation.test;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.net.URI;
+import java.util.Map;
+import java.util.Properties;
+import java.util.HashMap;
+import java.util.concurrent.*;
 
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import javax.mail.Authenticator;
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.PasswordAuthentication;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+
 
 public class Imageout_pathVerify {
 
