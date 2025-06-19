@@ -13,144 +13,164 @@ import org.testng.annotations.Test;
 
 public class Imageout_pathVerify {
 
-    class QueryResult {
-        int id;
-        String filename;
-        String jp2Path;
-        boolean isQC;
+   public static void main(String[] args) {
+        Map<String, String> webSockets = new HashMap<>();
+        webSockets.put("dev2mani.humanbrain.in WebSocket", "wss://dev2mani.humanbrain.in/aiAgentServer/ws/ai_agent");
+        webSockets.put("apollo2.humanbrain.in WebSocket", "wss://apollo2.humanbrain.in/aiAgentServer/ws/ai_agent");
 
-        public QueryResult(int id, String filename, String jp2Path, boolean isQC) {
-            this.id = id;
-            this.filename = filename;
-            this.jp2Path = jp2Path;
-            this.isQC = isQC;
+        for (Map.Entry<String, String> entry : webSockets.entrySet()) {
+            String serverName = entry.getKey();
+            String webSocketUrl = entry.getValue();
+
+            try {
+                testWebSocketConnection(serverName, webSocketUrl);
+            } catch (Exception e) {
+                System.out.println("❌ Exception while checking " + serverName + ": " + e.getMessage());
+                sendAlertMail(serverName, e.getMessage(), "222 1000", "Divya D", 193, "Neurovoyager");
+            }
         }
     }
 
-    @Test
-    public void testDB() {
-        // Retrieve slidebatchId from Jenkins parameter or ask for manual input in Eclipse
-        String slidebatchId = System.getenv("SLIDEBATCH_ID"); // Retrieve slidebatchId from Jenkins
+    private static void testWebSocketConnection(String serverName, String webSocketUrl) throws InterruptedException {
+        System.out.println("🔍 Connecting to " + serverName + " → " + webSocketUrl);
 
-        // If the slidebatchId is not passed from Jenkins, prompt the user in Eclipse for input
-        if (slidebatchId == null || slidebatchId.isEmpty()) {
-            Scanner scanner = new Scanner(System.in);
-            System.out.println("Slidebatch ID is not provided via Jenkins. Please enter the Slidebatch ID manually:");
-            slidebatchId = scanner.nextLine();
-            scanner.close();  // Close the scanner after use
-        }
+        CountDownLatch latch = new CountDownLatch(1);
 
-        // Log the value of slidebatchId for debugging purposes
-        System.out.println("Received Slidebatch ID: " + slidebatchId);
+        WebSocketClient client = new WebSocketClient(URI.create(webSocketUrl)) {
 
-        // Check if slidebatchId is valid (not empty or null)
-        if (slidebatchId == null || slidebatchId.isEmpty()) {
-            System.out.println("Slidebatch ID is not provided. Please ensure the parameter is passed.");
-            return; // Exit the test if slidebatchId is not provided
-        }
+            private StringBuilder responseBuffer = new StringBuilder();
+            private ScheduledExecutorService scheduler;
+            private ScheduledFuture<?> timeoutFuture;
 
-        // Convert slidebatchId to integer
-        int slidebatchIdInt = Integer.parseInt(slidebatchId);
+            @Override
+            public void onOpen(ServerHandshake handshake) {
+            	  String[] pagesToTest = {"Atlas Editor", "SomeOtherPage", "Neurovoyager"};
+                String testMessage = "{"
+                        + "\"query\": \"222 1000\","
+                        + "\"user\": \"Divya D\","
+                        + "\"userId\": 193,"
+                        + "\"page\": \"Neurovoyager\","
+                        + "\"page_context\": {}"
+                        + "}";
+                send(testMessage);
+                System.out.println("📤 Sent: " + testMessage);
 
-        String url = "jdbc:mysql://apollo2.humanbrain.in:3306/HBA_V2";
-        String username = "root";
-        String password = "Health#123";
+                scheduler = Executors.newSingleThreadScheduledExecutor();
+                timeoutFuture = scheduler.schedule(() -> {
+                    logFailureMessage(serverName, "Timeout (15 seconds)");
+                    latch.countDown();
+                    close();
+                }, 15, TimeUnit.SECONDS);
+            }
 
-        // Establish connection to the database
-        try (Connection connection = DriverManager.getConnection(url, username, password)) {
-            System.out.println("MYSQL database connected");
+            @Override
+            public void onMessage(String message) {
+                System.out.println("📥 Received: " + message);
+                responseBuffer.append(message);
 
-            // Execute the query and collect results
-            List<QueryResult> queryResults = executeAndCollectQueryResults(connection, slidebatchIdInt);
-
-            // Print the query results in a table format
-            printQueryResults(queryResults);
-
-            // List to collect incorrect paths
-            List<String> incorrectPaths = new ArrayList<>();
-
-            // Check formats for each result
-            for (QueryResult result : queryResults) {
-                List<String> providedFormats = executeSSHCommand(result.filename);
-                if (!isPathValid(result.jp2Path)) {
-                    incorrectPaths.add(result.jp2Path); // Add incorrect path to the list
+                if (message.contains("###END")) {
+                    if (timeoutFuture != null) timeoutFuture.cancel(true);
+                    System.out.println("✅ Full AI Agent response received from " + serverName + ":");
+                    System.out.println(responseBuffer.toString());
+                    latch.countDown();
+                    close();
                 }
             }
 
-            // Print all incorrect paths
-            if (!incorrectPaths.isEmpty()) {
-                System.out.println("Incorrect JP2 Paths:");
-                for (String path : incorrectPaths) {
-                    System.out.println(path);
-                }
-            } else {
-                System.out.println("All paths are correct.");
+            @Override
+            public void onClose(int code, String reason, boolean remote) {
+                System.out.println("❌ WebSocket Closed for " + serverName + ". Code: " + code + ", Reason: " + reason);
+                if (timeoutFuture != null) timeoutFuture.cancel(true);
+                if (scheduler != null) scheduler.shutdownNow();
+                latch.countDown();
             }
 
-            // Fail the test if there are incorrect paths
-            Assert.assertTrue(incorrectPaths.isEmpty(), "Some JP2 paths did not match the expected format.");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private List<QueryResult> executeAndCollectQueryResults(Connection connection, int slidebatchId) {
-        List<QueryResult> queryResults = new ArrayList<>();
-        String query = "SELECT slidebatch.id, slide.filename, slide.jp2Path, huron_slideinfo.isQC "
-                     + "FROM slidebatch "
-                     + "LEFT JOIN slide ON slide.slidebatch = slidebatch.id "
-                     + "LEFT JOIN huron_slideinfo ON huron_slideinfo.slide = slide.id "
-                     + "WHERE slidebatch.id = " + slidebatchId;
-
-        try (Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(query)) {
-            while (resultSet.next()) {
-                int id = resultSet.getInt("id");
-                String filename = resultSet.getString("filename");
-                String jp2Path = resultSet.getString("jp2Path");
-                boolean isQC = resultSet.getBoolean("isQC");
-
-                queryResults.add(new QueryResult(id, filename, jp2Path, isQC));
+            @Override
+            public void onError(Exception ex) {
+                System.out.println("❌ Error in " + serverName + " WebSocket: " + ex.getMessage());
+                logFailureMessage(serverName, ex.getMessage());
+                if (timeoutFuture != null) timeoutFuture.cancel(true);
+                if (scheduler != null) scheduler.shutdownNow();
+                latch.countDown();
             }
+        };
+
+        try {
+            client.connectBlocking();
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("❌ Could not connect to " + serverName + " WebSocket: " + e.getMessage());
+            sendAlertMail(serverName, e.getMessage(), "222 1000", "Divya D", 193, "Neurovoyager");
+            return;
         }
 
-        return queryResults;
+        latch.await(); // Wait until message received or timeout
     }
 
-    private void printQueryResults(List<QueryResult> queryResults) {
-        // Print table header
-        System.out.println("Query Result:");
-        System.out.println("-------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-        System.out.printf("%-10s | %-45s | %-60s | %-5s%n", "ID", "Filename", "JP2 Path", "Is QC");
-        System.out.println("-------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+    private static void logFailureMessage(String serverName, String reason) {
+        String message = "❌ " + serverName + " WebSocket health check failed. Reason: " + reason;
+        System.out.println(message);
+        sendAlertMail(serverName, reason, "222 1000", "Divya D", 193, "Neurovoyager");
+    }
 
-        // Print table rows
-        for (QueryResult result : queryResults) {
-            System.out.printf("%-10d | %-45s | %-60s | %-5b%n", 
-                result.id, 
-                result.filename, 
-                result.jp2Path, 
-                result.isQC
-            );
+    private static void sendAlertMail(String serverName, String reason, String query, String user, int userId, String page) {
+        String[] to = {"sriramv@htic.iitm.ac.in"};
+        String[] cc = {"venip@htic.iitm.ac.in", "divya.d@htic.iitm.ac.in", "gayathri@htic.iitm.ac.in"};
+        String from = "gayathri@htic.iitm.ac.in";
+        String host = "smtp.gmail.com";
+
+        Properties properties = System.getProperties();
+        properties.put("mail.smtp.host", host);
+        properties.put("mail.smtp.port", "465");
+        properties.put("mail.smtp.ssl.enable", "true");
+        properties.put("mail.smtp.auth", "true");
+
+        Session session = Session.getInstance(properties, new Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication("automationsoftware25@gmail.com", "wjzcgaramsqvagxu");
+            }
+        });
+
+        session.setDebug(true);
+
+        try {
+            MimeMessage message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(from));
+
+            for (String recipient : to) {
+                message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient));
+            }
+            for (String ccRecipient : cc) {
+                message.addRecipient(Message.RecipientType.CC, new InternetAddress(ccRecipient));
+            }
+
+            message.setSubject("AI Agent - WebSocket Connection Issue Alert: " + serverName);
+
+            String currentTime = java.time.LocalDateTime.now().toString();
+
+            String content = "<div style='font-family: Arial, sans-serif; font-size: 14px; color: #333;'>"
+                + "<h3 style='color: #D9534F;'>🚨 AI Agent WebSocket Connection Failure Alert</h3>"
+                + "<p>Hi Team,</p>"
+                + "<p><strong>WebSocket connection to <span style='color:#5bc0de;'>" + serverName + "</span> failed at <strong>" + currentTime + "</strong>.</strong></p>"
+                + "<p><u><strong>Error Details:</strong></u></p>"
+                + "<ul>"
+                + "<li><strong>Page:</strong> " + page + "</li>"
+                + "<li><strong>User:</strong> " + user + " (ID: " + userId + ")</li>"
+                + "<li><strong>Query:</strong> " + query + "</li>"
+                + "<li><strong>Reason:</strong> " + reason + "</li>"
+                + "</ul>"
+                + "<p><u><strong>Action:</strong></u></p>"
+                + "<p>Please check WebSocket server status, nginx proxy configuration, and SSL certificate.</p>"
+                + "<br><p style='color: #555;'>Regards,<br><b>Automated Monitoring</b></p>"
+                + "</div>";
+
+            message.setContent(content, "text/html");
+
+            System.out.println("Sending reachability alert email...");
+            Transport.send(message);
+            System.out.println("Email sent successfully.");
+
+        } catch (MessagingException mex) {
+            mex.printStackTrace();
         }
-
-        System.out.println("-------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-    }
-
-    private List<String> executeSSHCommand(String filename) {
-        // Placeholder for SSH command execution logic
-        // This method should execute the SSH command and return the list of provided formats
-        // Example return, you will replace with actual logic
-        return new ArrayList<>();
-    }
-
-    private boolean isPathValid(String jp2Path) {
-        // Define the expected prefix
-        String expectedPrefix = "/ddn/storageIIT/humanbrain/analytics";
-
-        // Check if jp2Path starts with the expected prefix
-        return jp2Path.startsWith(expectedPrefix);
     }
 }
